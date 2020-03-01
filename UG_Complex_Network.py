@@ -9,15 +9,24 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import time
 
 class UG_Complex_Network():
-    def __init__(self,node_num = 10000,network_type = "SF",update_rule ="NS",player_type = "B",avg_degree = 4):
+    def __init__(self,node_num = 10000,network_type = "SF",update_rule ="NS",player_type = "B",avg_degree = 4,check_point = None):
         self.node_num = node_num
         self.avg_degree = avg_degree
         self.network_type = network_type # "SF" or "ER"
         self.player_type = player_type # "A" or "B" "C"
         self.update_rule = update_rule # "NS" or "SP"
 
+        if not os.path.exists("./result"):
+            os.mkdir('./result')
+
+        if check_point == None:
+            self.dir_str = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
+            os.mkdir("./result/{}".format(self.dir_str))
+        else:
+            self.dir_str = check_point
     
     def build_network(self,network_type = None):
         '''
@@ -161,6 +170,35 @@ class UG_Complex_Network():
         plt.legend(loc = 'upper right')
         plt.show()
         
+    def save(self,G,Epoch):
+        result_dir = './result/'
+        info = "{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,Epoch)
+        Epoch_dir = os.path.join(result_dir,self.dir_str,info)
+        if not os.path.exists(Epoch_dir):
+            os.mkdir(Epoch_dir)
+        graph_path = os.path.join(Epoch_dir,info+"_Graph.yaml")
+        nx.write_yaml(G,graph_path)
+
+    def retrain(self,filepath):
+        '''
+        continue evolution from specific check point
+        '''
+        print(filepath)
+        filepath = os.path.join('./result/',filepath)
+        lists = os.listdir(filepath)   
+        lists.sort(key=lambda fn: os.path.getmtime(filepath + "/" + fn)) 
+        result_dir = os.path.join(filepath, lists[-1])      
+        result_list = os.listdir(result_dir)
+        result_list.sort()
+        parse_str = result_list[0][:-5].split("_")
+        self.network_type = parse_str[0]
+        self.player_type = parse_str[1]
+        self.update_rule = parse_str[2]
+        Epoch = int(parse_str[3])
+        graph_path = os.path.join(result_dir,result_list[0])
+        G = nx.read_yaml(graph_path)
+        return G,Epoch+1
+        
 
     def get_all_values(self,G,attr_name):
         '''
@@ -197,23 +235,29 @@ class UG_Complex_Network():
 if __name__ == '__main__':
 
     node_num = 10000
-    network_type = "SF"
-    update_rule ='NS'
-    player_type = "B"
+    network_type = "ER" #"SF or ER"
+    update_rule ='SP'#"NS or SP"
+    player_type = "C"
     avg_degree = 4
-    UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree)
-    #bulids network structure
-    G = UG.build_network()
-    #initialize the strategy of player in network
-    UG.initialize_strategy(G)
-    #play game
-    Start = 1
     Epochs = Epochs = pow(10,6)
+    # check_point = None
+    check_point = '2020-03-01-19-59-07'
+    if check_point != None:
+        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,check_point)
+        G,Start  = UG.retrain(check_point)
+    else:
+        Start = 1
+        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree)
+        #bulids network structure
+        G = UG.build_network()
+        #initialize the strategy of player in network
+        UG.initialize_strategy(G)
+    #play game
     for Epoch in range(Start,Epochs+1):
         UG.synchronous_play(G)
         UG.update(G)
-        if Epoch % 500 == 0:
-            # UG.Save()
-            UG.viz(G)
-            print("Running!")
+        # if Epoch % 2 == 0:
+        UG.save(G,Epoch)
+        # UG.viz(G)
+        print("Running!")
         

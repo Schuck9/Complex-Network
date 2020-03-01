@@ -6,7 +6,7 @@ A simple implementation of Ultimatum Game in complex network
 
 import os
 import networkx as nx
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
@@ -64,8 +64,7 @@ class UG_Complex_Network():
                 strategy = np.random.rand()
                 G.nodes[n]['p'] = strategy 
                 G.nodes[n]['q'] = 1-strategy
-                G.nodes[n]['Apayoff'] = 0 
-
+                G.nodes[n]['payoff'] = 0 
         elif Type == 'A':
             for n in node_list:
                 #Type-A player
@@ -122,7 +121,7 @@ class UG_Complex_Network():
                     cnt += 1
                     G.nodes[n]['p'] = G.nodes[nbr]['p']
                     G.nodes[n]['q'] = G.nodes[nbr]['q']
-        print("occur:",cnt)
+        # print("occur:",cnt)
 
     def social_penalty(self,G):
         '''
@@ -251,7 +250,7 @@ if __name__ == '__main__':
     node_num = 10000
     network_type = "SF" #"SF or ER"
     update_rule ='NS'#"NS or SP"
-    player_type = "A"
+    player_type = "B"
     avg_degree = 4
     Epochs = Epochs = pow(10,6)
     check_point = None

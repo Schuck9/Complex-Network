@@ -1,6 +1,6 @@
 """
 A simple implementation of Ultimatum Game in complex network
-@date: 2020.2.29
+@date: 2020.3.1
 @author: Tingyu Mo
 """
 
@@ -56,17 +56,17 @@ class UG_Complex_Network():
 
     def strategy_asigned(self,G,node_list,Type = 'B'):
         '''
-        A B C ,three types individual
+        A B C ,three types inBdividual
         '''
-        if Type == 'A':
+        if Type == 'B':
             for n in node_list:
                 #Type-A player
                 strategy = np.random.rand()
                 G.nodes[n]['p'] = strategy 
                 G.nodes[n]['q'] = 1-strategy
-                G.nodes[n]['payoff'] = 0 
+                G.nodes[n]['Apayoff'] = 0 
 
-        elif Type == 'B':
+        elif Type == 'A':
             for n in node_list:
                 #Type-A player
                 strategy = np.random.rand()
@@ -100,13 +100,16 @@ class UG_Complex_Network():
                 if offer > demand:
                     # G.node[nbr]['payoff'] += 1-offer
                     G.nodes[n]['payoff'] += offer
-            G.nodes[n]['payoff'] /= G.degree(n)
+            num_nbrs = G.degree(n)
+            if num_nbrs != 0:
+                G.nodes[n]['payoff'] /= G.degree(n)
         
     def natural_selection(self,G):
         '''
         each player i in the network selects at random one neighbor j 
         and compares its payoff Πi with that of j
         '''
+        cnt = 0
         for n in list(G.nodes()):
             nbrs = list(G.adj[n])
             nbr = np.random.choice(nbrs,size = 1)[0]
@@ -116,8 +119,10 @@ class UG_Complex_Network():
                 probs_adopt =  (nbr_payoff - n_payoff)/(2*max(G.degree(n),G.degree(nbr)))
                 if np.random.rand() < probs_adopt:
                     # n adopts nbr's strategy
+                    cnt += 1
                     G.nodes[n]['p'] = G.nodes[nbr]['p']
                     G.nodes[n]['q'] = G.nodes[nbr]['q']
+        print("occur:",cnt)
 
     def social_penalty(self,G):
         '''
@@ -171,6 +176,7 @@ class UG_Complex_Network():
         plt.show()
         
     def save(self,G,Epoch):
+        #Save Graph
         result_dir = './result/'
         info = "{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,Epoch)
         Epoch_dir = os.path.join(result_dir,self.dir_str,info)
@@ -178,6 +184,14 @@ class UG_Complex_Network():
             os.mkdir(Epoch_dir)
         graph_path = os.path.join(Epoch_dir,info+"_Graph.yaml")
         nx.write_yaml(G,graph_path)
+        #Save strategy
+        p_vector = self.get_all_values(G,'p')
+        q_vector = self.get_all_values(G,'q')
+        pq_array = np.vstack((p_vector,q_vector))
+        pq_path = os.path.join(Epoch_dir,info+"_strategy.csv")
+        pq = pd.DataFrame(data = pq_array)
+        pq.to_csv(pq_path)
+
 
     def retrain(self,filepath):
         '''
@@ -235,13 +249,13 @@ class UG_Complex_Network():
 if __name__ == '__main__':
 
     node_num = 10000
-    network_type = "ER" #"SF or ER"
-    update_rule ='SP'#"NS or SP"
-    player_type = "C"
+    network_type = "SF" #"SF or ER"
+    update_rule ='NS'#"NS or SP"
+    player_type = "A"
     avg_degree = 4
     Epochs = Epochs = pow(10,6)
-    # check_point = None
-    check_point = '2020-03-01-19-59-07'
+    check_point = None
+    # check_point = '2020-03-01-19-59-07'
     if check_point != None:
         UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,check_point)
         G,Start  = UG.retrain(check_point)
@@ -256,8 +270,9 @@ if __name__ == '__main__':
     for Epoch in range(Start,Epochs+1):
         UG.synchronous_play(G)
         UG.update(G)
-        # if Epoch % 2 == 0:
-        UG.save(G,Epoch)
-        # UG.viz(G)
-        print("Running!")
+        if Epoch % 100 == 0:
+            print("Epoch[{}]".format(Epoch))
+            UG.save(G,Epoch)
+            # UG.viz(G)
+            
         

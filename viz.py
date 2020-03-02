@@ -28,6 +28,7 @@ def viz(RecordName,time_option = "all"):
     parse_str = checkpoint_list[0].split("_")
     del(parse_str[-1])
     info_str = '_'.join(parse_str)
+    save_path =os.path.join(record_dir, info_str+'.jpg')
     y_axis_plist = []
     y_axis_qlist = []
     for Epoch in Epoch_list:
@@ -45,25 +46,26 @@ def viz(RecordName,time_option = "all"):
         p = pq_distribution(p)
         q = pq_distribution(q)
     
-        y_axis_plist.append(p)
-        y_axis_qlist.append(q)
+        y_axis_plist.append(p/10000)
+        y_axis_qlist.append(q/10000)
 
-        plt.figure()
+    plt.figure()
+    x_axis = np.arange(0,1.05,1/20)
+    # plt.rcParams['font.sans-serif']=['SimHei']
+    # plt.rcParams['axes.unicode_minus'] = False
+    # # plt.title("")
+    plt.xlabel("p")#x轴p上的名字
+    plt.ylabel("D(p)")#y轴上的名字
+    plt.plot(x_axis, y_axis_plist[0] ,marker='^',linestyle='-',color='skyblue', label='t = 100')
+    plt.plot(x_axis, y_axis_plist[1], marker='s',linestyle='-',color='green', label='t = 1000')
+    plt.plot(x_axis, y_axis_plist[2], marker='*',linestyle='-',color='red', label='t = 20000')
+    # plt.plot(x_axis, thresholds, color='blue', label='threshold')
+    plt.legend(loc = 'upper right') # 显示图例
+    plt.savefig(save_path)
+    print("Figure has been saved to: ",save_path)
+    plt.show()
     
-        plt.plot(x_axis,y_data,label='p')
-        for i,Epoch in enumerate(Epoch_list):
-            plt.plot(x_axis,y_axis_plist[i],label=str(Epoch) )
-        # plt.plot(x_data,y_data,color='red',label=)
-        plt.rcParams['font.sans-serif']=['SimHei']
-        plt.rcParams['axes.unicode_minus'] = False
-        # plt.title("")
-        # ax_label = ['0',' ','1/6',' ','1/3',' ','1/2',' ','2/3',' ','5/6',' ','1']
-        # plt.xticks(x_data,ax_label,fontsize=16)
-        # plt.yticks(,ax_label,fontsize=16)
-        plt.xlabel("p")#x轴p上的名字
-        plt.ylabel("D(p)")#y轴上的名字
-        plt.legend(loc = 'upper right')
-        plt.show()
+
     
 
 
@@ -74,6 +76,6 @@ def viz(RecordName,time_option = "all"):
 
 if __name__ == '__main__':
 
-    RecordName ='SF/2020-03-01-23-14-38'   
+    RecordName ='ER/2020-03-02-12-13-08'   
     time_option = "all"
     viz(RecordName,time_option)

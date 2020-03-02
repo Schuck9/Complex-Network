@@ -17,7 +17,7 @@ class UG_Complex_Network():
         self.avg_degree = avg_degree
         self.network_type = network_type # "SF" or "ER"
         self.player_type = player_type # "A" or "B" "C"
-        self.update_rule = update_rule # "NS" or "SP"
+        self.update_rule = update_rule # "SP" or "SP"
 
         if not os.path.exists("./result"):
             os.mkdir('./result')
@@ -139,7 +139,8 @@ class UG_Complex_Network():
             if G.nodes[n]['payoff'] < G.nodes[lowest_n]['payoff']:
                 lowest_n = n
 
-        lowest_cluster = list(G.adj[lowest_n]).append(lowest_n)
+        lowest_cluster = list(G.adj[lowest_n])
+        lowest_cluster.append(lowest_n)
         
         self.strategy_asigned(G,lowest_cluster,Type = self.player_type)
         # for n in lowest_cluster:
@@ -255,11 +256,11 @@ class UG_Complex_Network():
 if __name__ == '__main__':
 
     node_num = 10000
-    network_type = "ER" #"SF or ER"
-    update_rule ='NS'   #"NS or SP"
+    network_type = "SF" #"SF or ER"
+    update_rule ='SP'   #"NS or SP"
     player_type = "A"
     avg_degree = 4
-    Epochs = Epochs = pow(10,6)
+    Epochs = 21000
     check_point = None
     # check_point = '2020-03-01-19-59-07'
     if check_point != None:

@@ -1,12 +1,12 @@
 """
 A simple implementation of Ultimatum Game in complex network
-@date: 2020.3.1
+@date: 2020.3.2
 @author: Tingyu Mo
 """
 
 import os
 import networkx as nx
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import time
@@ -41,6 +41,13 @@ class UG_Complex_Network():
             G = nx.random_graphs.barabasi_albert_graph(self.node_num, int(self.avg_degree/2))
         elif network_type == "ER":
             G = nx.random_graphs.erdos_renyi_graph(self.node_num, self.avg_degree/self.node_num)
+            for n in G.nodes():
+                if G.degree(n) == 0:
+                    while True:
+                        nbr = np.random.choice(G.nodes(),size = 1)[0]
+                        if nbr != n:
+                            break
+                    G.add_edge(n, nbr)
         elif "other":
             pass      
 
@@ -248,9 +255,9 @@ class UG_Complex_Network():
 if __name__ == '__main__':
 
     node_num = 10000
-    network_type = "SF" #"SF or ER"
-    update_rule ='NS'#"NS or SP"
-    player_type = "B"
+    network_type = "ER" #"SF or ER"
+    update_rule ='NS'   #"NS or SP"
+    player_type = "A"
     avg_degree = 4
     Epochs = Epochs = pow(10,6)
     check_point = None

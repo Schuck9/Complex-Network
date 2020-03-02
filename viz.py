@@ -10,7 +10,7 @@ import pandas as pd
 import os
 
 
-def pq_distribution(self,value_list):
+def pq_distribution(value_list):
     x_axis = np.arange(0,1.05,1/20) # 21 descrete points,range 0~1,step size 0.05
     y_axis = np.zeros(x_axis.size)
     for v in value_list:
@@ -20,27 +20,33 @@ def pq_distribution(self,value_list):
     return y_axis
 
 def viz(RecordName,time_option = "all"):
-    Epoch_list = ['1','100','1000','20000']
+    # Epoch_list = ['1','100','1000','20000']
+    Epoch_list = ['100','1000','20000']
     result_dir = "./result"
-    record_dir = os.path.join(result_dir,record_name)
+    record_dir = os.path.join(result_dir,RecordName)
     checkpoint_list = os.listdir(record_dir)
     parse_str = checkpoint_list[0].split("_")
-    del(parse_str[-1]]
+    del(parse_str[-1])
     info_str = '_'.join(parse_str)
     y_axis_plist = []
     y_axis_qlist = []
     for Epoch in Epoch_list:
-        info_e = info,"_"+Epoch
+        info_e = info_str+"_"+Epoch
         Epoch_dir = os.path.join(record_dir,info_e )
-        stratagy_path = os.path.join(Epoch_dir,info_e+"_stratagy.csv")
+        strategy_path = os.path.join(Epoch_dir,info_e+"_strategy.csv")
         strategy = pd.read_csv(strategy_path)
+        # strategy.reset_index(drop = True)
         pq_array = strategy.values
-        # p = pq_array[0][:]
-        # q = pq_array[1][:]
-        p = pq_distribution(pq_array[0][:])
-        q = pq_distribution(pq_array[1][:])
+        # np.delete(pq_array,1,axis=1)
+        p = pq_array[0][1:]
+        q = pq_array[1][1:]
+        # del(p[0])
+        # del(q[0])
+        p = pq_distribution(p)
+        q = pq_distribution(q)
+    
         y_axis_plist.append(p)
-        y_axis_qlist.append(q))
+        y_axis_qlist.append(q)
 
         plt.figure()
     
@@ -68,6 +74,6 @@ def viz(RecordName,time_option = "all"):
 
 if __name__ == '__main__':
 
-    RecordName ='2020-03-01-23-14-38'   
+    RecordName ='SF/2020-03-01-23-14-38'   
     time_option = "all"
     viz(RecordName,time_option)

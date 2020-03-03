@@ -51,38 +51,8 @@ class UG_Complex_Network():
                     G.add_edge(n, nbr)
         elif "RG":
             G = nx.random_graphs.random_regular_graph(self.avg_degree, self.node_num)
-            # G.add_weighted_edges_from([(1,2,0.125), (1,3,0.75), (2,4,1.2), (3,4,0.275)])
-            #初始化所有权重
-            for n in list(G.nodes()):
-                nbrs = list(G.adj[n])
-                for nbr in nbrs:
-                    G.edges[n, nbr]['weight'] = 0
-            
-            #检查双方是否存在紧密联系者
-            for n in list(G.nodes()):
-                nbrs = list(G.adj[n])
-                for nbr in nbrs:
-                    isMaxWeightExisIn_N = self.nbr_weighted_check(G,n)
-                    isMaxWeightExisIn_Nbr = self.nbr_weighted_check(G,nbr)
-                    if (isMaxWeightExisIn_N == None) and (isMaxWeightExisIn_Nbr == None):
-                        G.edges[n, nbr]['weight'] = self.max_weight
-                    elif (isMaxWeightExisIn_N==nbr) and (isMaxWeightExisIn_Nbr == n):
-                        G.edges[n, nbr]['weight'] = self.max_weight
-                    elif (isMaxWeightExisIn_N != None) or (isMaxWeightExisIn_Nbr != None) :
-                        G.edges[n, nbr]['weight'] = (1-self.max_weight)/(self.avg_degree-1)
-        
-                              
-            cnt = 0
-            # 打印输出
-            # for n, nbrs in G.adjacency():
-            #     for nbr, eattr in nbrs.items():
-            #         data = eattr['weight']
-            #         print('(%d, %d, %0.3f)' % (n,nbr,data))
-            for n in list(G.nodes()):
-                result = self.nbr_weighted_check(G,n)
-                if result == None:
-                    cnt += 1
-            print("无亲密关系者率:",cnt/self.node_num)
+            G = self.network_weights_asign(G)
+
                  
 
         print("平均连接度为: ",self.avg_degree_caculate(G))
@@ -97,7 +67,39 @@ class UG_Complex_Network():
                 break
         return is_MaxWeight_exis
         
+    def network_weights_asign(self,G):
+        #边权重初始化
+        for n in list(G.nodes()):
+            nbrs = list(G.adj[n])
+            for nbr in nbrs:
+                G.edges[n, nbr]['weight'] = 0
+        
+        #检查双方是否存在紧密联系者
+        for n in list(G.nodes()):
+            nbrs = list(G.adj[n])
+            for nbr in nbrs:
+                isMaxWeightExisIn_N = self.nbr_weighted_check(G,n)
+                isMaxWeightExisIn_Nbr = self.nbr_weighted_check(G,nbr)
+                if (isMaxWeightExisIn_N == None) and (isMaxWeightExisIn_Nbr == None):
+                    G.edges[n, nbr]['weight'] = self.max_weight
+                elif (isMaxWeightExisIn_N==nbr) and (isMaxWeightExisIn_Nbr == n):
+                    G.edges[n, nbr]['weight'] = self.max_weight
+                elif (isMaxWeightExisIn_N != None) or (isMaxWeightExisIn_Nbr != None) :
+                    G.edges[n, nbr]['weight'] = (1-self.max_weight)/(self.avg_degree-1)
+                    
+        # 打印输出
+        # for n, nbrs in G.adjacency():
+        #     for nbr, eattr in nbrs.items():
+        #         data = eattr['weight']
+        #         print('(%d, %d, %0.3f)' % (n,nbr,data))
+        cnt = 0
+        for n in list(G.nodes()):
+            result = self.nbr_weighted_check(G,n)
+            if result == None:
+                cnt += 1
+        print("无亲密关系者率:",cnt/self.node_num)
 
+        return G
 
     def initialize_strategy(self,G):
         '''
@@ -300,7 +302,7 @@ class UG_Complex_Network():
         
 if __name__ == '__main__':
 
-    node_num = 10003
+    node_num = 10000
     network_type = "NG" # [SF, ER, NG]
     update_rule ='SP'   # [NS, SP]
     player_type = "B" # [A=(p=q,q), B=(p,1-p), C=(p,q)]

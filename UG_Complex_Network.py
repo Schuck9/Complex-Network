@@ -1,6 +1,6 @@
 """
 A simple implementation of Ultimatum Game in complex network
-@date: 2020.3.2
+@date: 2020.3.8
 @author: Tingyu Mo
 """
 
@@ -13,7 +13,7 @@ import time
 
 class UG_Complex_Network():
     def __init__(self,node_num = 10000,network_type = "SF",update_rule ="NS",player_type = "B",
-        avg_degree = 4,intensity_selection = 0.01,check_point = None):
+        avg_degree = 4,intensity_selection = 0.01,mutate_rate = 0.001,check_point = None):
         self.node_num = node_num
         self.avg_degree = avg_degree
         self.network_type = network_type # "SF" or "ER"
@@ -21,6 +21,9 @@ class UG_Complex_Network():
         self.update_rule = update_rule # "SP" or "SP"
         self.max_weight = 0.4
         self.intensity_selection = intensity_selection
+        self.mutate_rate = mutate_rate
+        self.avg_strategy = (0,0)
+        self.avg_pq_list=[]
 
         if not os.path.exists("./result"):
             os.mkdir('./result')
@@ -30,6 +33,7 @@ class UG_Complex_Network():
             os.mkdir("./result/{}".format(self.dir_str))
         else:
             self.dir_str = check_point
+            
     
     def build_network(self,network_type = None):
         '''
@@ -231,6 +235,8 @@ class UG_Complex_Network():
         G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
         G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']
 
+        return chosen_individual,reproduce_individual
+
     def birth_death_updating(self,G):
         '''
         birth death updating process,
@@ -249,6 +255,8 @@ class UG_Complex_Network():
         chosen_individual = np.random.choice(nbrs,size = 1)[0]
         G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
         G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']
+
+        return chosen_individual,reproduce_individual
            
     def pairwise_comparison(self,G):
         '''
@@ -264,6 +272,8 @@ class UG_Complex_Network():
         if np.random.rand() < imitate_probability:
             G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
             G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']   
+        
+        return chosen_individual,reproduce_individual
 
     def imitaion_updaing(self,G):
         '''
@@ -288,28 +298,51 @@ class UG_Complex_Network():
         G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
         G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q'] 
 
+        return chosen_individual,reproduce_individual
+
+    def mutation(self,G,chosen_individual,reproduce_individual):
+        if np.random.rand(1) <= self.mutate_rate*10:
+            G.nodes[chosen_individual]['p'],G.nodes[chosen_individual]['q'] = np.random.rand(2)
+            print("MC")
+        # else:
+        #     G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
+        #     G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']   
+
     def update(self,G):
         '''
         natural seletion an social penalty
         '''
         if self.update_rule == "NS":
-            self.natural_selection(G)
+            chosen_individual,reproduce_individual = self.natural_selection(G)
         elif self.update_rule == "SP":
-            self.social_penalty(G)
+            chosen_individual,reproduce_individual = self.social_penalty(G)
         elif self.update_rule == "DB":
-            self.death_birth_updating(G)
+            chosen_individual,reproduce_individual = self.death_birth_updating(G)
         elif self.update_rule == "BD":
-            self.birth_death_updating(G)
+            chosen_individual,reproduce_individual = self.birth_death_updating(G)
         elif self.update_rule == "PC":
-            self.pairwise_comparison(G)
+            chosen_individual,reproduce_individual = self.pairwise_comparison(G)
         elif self.update_rule == "IU":
-            self.imitaion_updaing(G)
-
+            chosen_individual,reproduce_individual = self.imitaion_updaing(G)
         
+        self.mutation(G,chosen_individual,reproduce_individual)
+
+    def avg_strategy_calculate(self,G,Epoch):
+        '''
+        calculate the mean strategy over arg Epoch
+        '''
+        p_vector = self.get_all_values(G,'p')
+        q_vector = self.get_all_values(G,'q')
+        p,q = self.avg_strategy #the Epoch-1's average strategy
+        p = ((p*self.node_num*(Epoch-1)) + np.sum(p_vector))*1.0/(Epoch*self.node_num)
+        q = ((q*self.node_num*(Epoch-1)) + np.sum(q_vector))*1.0/(Epoch*self.node_num)
+        # self.avg_pq_list.append((p,q))
+        return (p,q)
+    
     def save(self,G,Epoch):
         #Save Graph
         result_dir = './result/'
-        info = "{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,Epoch)
+        info = "{}_{}_{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,self.intensity_selection,self.mutate_rate,Epoch)
         Epoch_dir = os.path.join(result_dir,self.dir_str,info)
         if not os.path.exists(Epoch_dir):
             os.mkdir(Epoch_dir)
@@ -322,6 +355,10 @@ class UG_Complex_Network():
         pq_path = os.path.join(Epoch_dir,info+"_strategy.csv")
         pq = pd.DataFrame(data = pq_array)
         pq.to_csv(pq_path)
+        #Save average offer/respond
+        avg_pq_path = os.path.join(Epoch_dir,info+"_average_strategy.csv")
+        avg_pq = pd.DataFrame(data = self.avg_pq_list)
+        avg_pq.to_csv(avg_pq_path)
 
 
     def retrain(self,filepath):
@@ -339,8 +376,13 @@ class UG_Complex_Network():
         self.network_type = parse_str[0]
         self.player_type = parse_str[1]
         self.update_rule = parse_str[2]
-        Epoch = int(parse_str[3])
+        self.intensity_selection =  float(parse_str[3])
+        self.mutate_rate = float(parse_str[4])
+        Epoch = int(parse_str[5])
         graph_path = os.path.join(result_dir,result_list[0])
+        avg_pq_path = os.path.join(result_dir,result_list[1])
+        avg_pq = pd.read_csv(avg_pq_path)
+        self.avg_strategy = avg_pq.values[-1][1:]
         G = nx.read_yaml(graph_path)
         return G,Epoch+1
         
@@ -381,15 +423,18 @@ if __name__ == '__main__':
 
     node_num = 100
     network_type = "RG" # [SF, ER, RG]
-    update_rule ='IU'   # [NS, SP, DB, BD, PC, IU]
-    player_type = "B" # [A=(p=q,q), B=(p,1-p), C=(p,q)]
+    update_rule ='PC'   # [NS, SP, DB, BD, PC, IU]
+    player_type = "C" # [A=(p=q,q), B=(p,1-p), C=(p,q)]
     avg_degree = 4
-    intensity_selection = 1
-    Epochs = 21000
+    intensity_selection = 0.01
+    mutate_rate = 0.001
+    
+    avg_strategy_list = []
+    Epochs = pow(10,7)
     check_point = None
-    # check_point = '2020-03-01-19-59-07'
+    # check_point = '2020-03-08-11-52-42'
     if check_point != None:
-        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,intensity_selection,check_point)
+        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,intensity_selection,mutate_rate,check_point)
         G,Start  = UG.retrain(check_point)
     else:
         Start = 1
@@ -400,11 +445,14 @@ if __name__ == '__main__':
         UG.initialize_strategy(G)
     #play game
     for Epoch in range(Start,Epochs+1):
-        # UG.initialize_payoff(G)
+        UG.initialize_payoff(G)
         UG.synchronous_play(G)
         UG.update(G)
-        if Epoch % 100 == 0:
+        UG.avg_strategy = UG.avg_strategy_calculate(G,Epoch)
+        if Epoch % 10000 == 0:
             print("Epoch[{}]".format(Epoch))
+            print("Average strategy: (p ,q)={}\n".format(UG.avg_strategy))
+            UG.avg_pq_list.append(UG.avg_strategy)
             UG.save(G,Epoch)
             # UG.viz(G)
             

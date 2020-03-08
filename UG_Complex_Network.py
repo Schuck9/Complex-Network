@@ -1,6 +1,6 @@
 """
 A simple implementation of Ultimatum Game in complex network
-@date: 2020.3.8
+@date: 2020.3.2
 @author: Tingyu Mo
 """
 
@@ -12,18 +12,12 @@ import pandas as pd
 import time
 
 class UG_Complex_Network():
-    def __init__(self,node_num = 10000,network_type = "SF",update_rule ="NS",player_type = "B",
-        avg_degree = 4,intensity_selection = 0.01,mutate_rate = 0.001,check_point = None):
+    def __init__(self,node_num = 10000,network_type = "SF",update_rule ="NS",player_type = "B",avg_degree = 4,check_point = None):
         self.node_num = node_num
         self.avg_degree = avg_degree
         self.network_type = network_type # "SF" or "ER"
         self.player_type = player_type # "A" or "B" "C"
         self.update_rule = update_rule # "SP" or "SP"
-        self.max_weight = 0.4
-        self.intensity_selection = intensity_selection
-        self.mutate_rate = mutate_rate
-        self.avg_strategy = (0,0)
-        self.avg_pq_list=[]
 
         if not os.path.exists("./result"):
             os.mkdir('./result')
@@ -33,7 +27,6 @@ class UG_Complex_Network():
             os.mkdir("./result/{}".format(self.dir_str))
         else:
             self.dir_str = check_point
-            
     
     def build_network(self,network_type = None):
         '''
@@ -46,7 +39,6 @@ class UG_Complex_Network():
         
         if network_type == "SF":
             G = nx.random_graphs.barabasi_albert_graph(self.node_num, int(self.avg_degree/2))
-            G = self.network_weights_asign(G)
         elif network_type == "ER":
             G = nx.random_graphs.erdos_renyi_graph(self.node_num, self.avg_degree/self.node_num)
             for n in G.nodes():
@@ -56,56 +48,10 @@ class UG_Complex_Network():
                         if nbr != n:
                             break
                     G.add_edge(n, nbr)
-        elif network_type == "RG":
-            G = nx.random_graphs.random_regular_graph(self.avg_degree, self.node_num)
-            G = self.network_weights_asign(G)
-
-                 
+        elif "other":
+            pass      
 
         print("平均连接度为: ",self.avg_degree_caculate(G))
-        return G
-
-    def nbr_weighted_check(self,G,n):
-        is_MaxWeight_exis = None
-        for nbr in G.adj[n]:
-            weight = G.edges[n, nbr]['weight']
-            if weight == self.max_weight:
-                is_MaxWeight_exis = nbr
-                break
-        return is_MaxWeight_exis
-        
-    def network_weights_asign(self,G):
-        #边权重初始化
-        for n in list(G.nodes()):
-            nbrs = list(G.adj[n])
-            for nbr in nbrs:
-                G.edges[n, nbr]['weight'] = 0
-        
-        #检查双方是否存在紧密联系者
-        for n in list(G.nodes()):
-            nbrs = list(G.adj[n])
-            for nbr in nbrs:
-                isMaxWeightExisIn_N = self.nbr_weighted_check(G,n)
-                isMaxWeightExisIn_Nbr = self.nbr_weighted_check(G,nbr)
-                if (isMaxWeightExisIn_N == None) and (isMaxWeightExisIn_Nbr == None):
-                    G.edges[n, nbr]['weight'] = self.max_weight
-                elif (isMaxWeightExisIn_N==nbr) and (isMaxWeightExisIn_Nbr == n):
-                    G.edges[n, nbr]['weight'] = self.max_weight
-                elif (isMaxWeightExisIn_N != None) or (isMaxWeightExisIn_Nbr != None) :
-                    G.edges[n, nbr]['weight'] = (1-self.max_weight)/(self.avg_degree-1)
-                    
-        # 打印输出
-        # for n, nbrs in G.adjacency():
-        #     for nbr, eattr in nbrs.items():
-        #         data = eattr['weight']
-        #         print('(%d, %d, %0.3f)' % (n,nbr,data))
-        cnt = 0
-        for n in list(G.nodes()):
-            result = self.nbr_weighted_check(G,n)
-            if result == None:
-                cnt += 1
-        print("无亲密关系者率:",cnt/self.node_num)
-
         return G
 
     def initialize_strategy(self,G):
@@ -113,19 +59,7 @@ class UG_Complex_Network():
         initialize every node's strategy
         '''
         self.strategy_asigned(G,list(G.nodes()),Type = self.player_type)
-
-    def initialize_payoff(self,G):
-        '''
-        clear all player's payoff
-        '''
-        for n in list(G.nodes()):
-            G.nodes[n]['payoff'] = 0 
-
-    def fitness_calculate(self,G,n):
-        '''
-        f = 1-w+w*Π
-        '''
-        return 1 - self.intensity_selection + self.intensity_selection*G.nodes[n]['payoff']
+        
 
     def strategy_asigned(self,G,node_list,Type = 'B'):
         '''
@@ -216,133 +150,42 @@ class UG_Complex_Network():
         #     G.nodes[n]['q'] = strategy
         #     G.nodes[n]['payoff'] = 0 
 
-    def death_birth_updating(self,G):
-        '''
-        death-birth updating process,
-        choose an individual randomly over the whole population,
-        reproduce the strategy with proportional to nbr's fitness
-        '''
-        individual_list = list(G.nodes())
-        chosen_individual = np.random.choice(individual_list,size=1)[0]
-        nbrs = list(G.adj[chosen_individual])
-        reproduce_probability = list()
-        for nbr in nbrs:
-            rp = self.fitness_calculate(G,nbr)
-            reproduce_probability.append(rp)
-        reproduce_probability = np.array(reproduce_probability)
-        reproduce_probability /= sum(reproduce_probability)
-        reproduce_individual = np.random.choice(nbrs,size=1,p = reproduce_probability)[0]
-        G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
-        G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']
-
-        return chosen_individual,reproduce_individual
-
-    def birth_death_updating(self,G):
-        '''
-        birth death updating process,
-        choose an individual with proportional to fitnees
-        replace one of its nbr randomly
-        '''
-        individual_list = list(G.nodes())
-        fitness_list = list()
-        for n in individual_list:
-            fitness = self.fitness_calculate(G,n)
-            fitness_list.append(fitness)
-        fitness_list = np.array(fitness_list)
-        fitness_list /= sum(fitness_list) 
-        reproduce_individual = np.random.choice(individual_list,size = 1,p = fitness_list)[0]
-        nbrs = list(G.adj[reproduce_individual])
-        chosen_individual = np.random.choice(nbrs,size = 1)[0]
-        G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
-        G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']
-
-        return chosen_individual,reproduce_individual
-           
-    def pairwise_comparison(self,G):
-        '''
-        pairwise comparison process,
-        choose an individual and its nbr randomlyj
-        individual imitate its nbr's strategy with probability of 1/1+e^(-w*(Πi-Πj))
-        '''    
-        individual_list = list(G.nodes())
-        chosen_individual = np.random.choice(individual_list,size=1)[0]
-        nbrs = list(G.adj[chosen_individual])
-        reproduce_individual = np.random.choice(nbrs,size = 1)[0]
-        imitate_probability = 1/(1+np.exp(-1*self.intensity_selection*(G.nodes[chosen_individual]['payoff']-G.nodes[reproduce_individual]['payoff'])))
-        if np.random.rand() < imitate_probability:
-            G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
-            G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']   
-        
-        return chosen_individual,reproduce_individual
-
-    def imitaion_updaing(self,G):
-        '''
-        imitaion updating process,
-        choose an individual randomly,
-        update its strategy with proportional to  its & nbrs fitness
-        '''
-        individual_list = list(G.nodes())
-        chosen_individual = np.random.choice(individual_list,size=1)[0]
-        fitness_list = list()
-        nbrs = list(G.adj[chosen_individual])
-        for n in nbrs:
-            fitness = self.fitness_calculate(G,n)
-            fitness_list.append(fitness)
-        nbrs.append(chosen_individual)
-        near_domain = nbrs
-        fitness_ci = self.fitness_calculate(G,chosen_individual)
-        fitness_list.append(fitness_ci)
-        fitness_list = np.array(fitness_list)
-        fitness_list /= sum(fitness_list)
-        reproduce_individual = np.random.choice(near_domain,size =1,p = fitness_list)[0]
-        G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
-        G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q'] 
-
-        return chosen_individual,reproduce_individual
-
-    def mutation(self,G,chosen_individual,reproduce_individual):
-        if np.random.rand(1) <= self.mutate_rate*10:
-            G.nodes[chosen_individual]['p'],G.nodes[chosen_individual]['q'] = np.random.rand(2)
-            print("MC")
-        # else:
-        #     G.nodes[chosen_individual]['p'] = G.nodes[reproduce_individual]['p']
-        #     G.nodes[chosen_individual]['q'] = G.nodes[reproduce_individual]['q']   
 
     def update(self,G):
         '''
         natural seletion an social penalty
         '''
         if self.update_rule == "NS":
-            chosen_individual,reproduce_individual = self.natural_selection(G)
+            self.natural_selection(G)
         elif self.update_rule == "SP":
-            chosen_individual,reproduce_individual = self.social_penalty(G)
-        elif self.update_rule == "DB":
-            chosen_individual,reproduce_individual = self.death_birth_updating(G)
-        elif self.update_rule == "BD":
-            chosen_individual,reproduce_individual = self.birth_death_updating(G)
-        elif self.update_rule == "PC":
-            chosen_individual,reproduce_individual = self.pairwise_comparison(G)
-        elif self.update_rule == "IU":
-            chosen_individual,reproduce_individual = self.imitaion_updaing(G)
-        
-        self.mutation(G,chosen_individual,reproduce_individual)
+            self.social_penalty(G)
 
-    def avg_strategy_calculate(self,G,Epoch):
+    def viz(self,G,x_data = None,y_data = None):
         '''
-        calculate the mean strategy over arg Epoch
+        Visualize  p distribution and q distribution
         '''
-        p_vector = self.get_all_values(G,'p')
-        q_vector = self.get_all_values(G,'q')
-        p,q = self.avg_strategy #the Epoch-1's average strategy
-        p = ((p*self.node_num*(Epoch-1)) + np.sum(p_vector))*1.0/(Epoch*self.node_num)
-        q = ((q*self.node_num*(Epoch-1)) + np.sum(q_vector))*1.0/(Epoch*self.node_num)
-        # self.avg_pq_list.append((p,q))
-        return (p,q)
-    
+        p_distribution = self.pq_distribution(G,'p')
+        # q_distribution = self.pq_distribution(G,'q')
+        
+        x_data,y_data = p_distribution
+        plt.figure()
+        plt.plot(x_data,y_data,label='p')
+        # plt.plot(x_data,y_data,color='red',label=)
+        plt.rcParams['font.sans-serif']=['SimHei']
+        plt.rcParams['axes.unicode_minus'] = False
+        # plt.title("")
+        # ax_label = ['0',' ','1/6',' ','1/3',' ','1/2',' ','2/3',' ','5/6',' ','1']
+        # plt.xticks(x_data,ax_label,fontsize=16)
+        # plt.yticks(,ax_label,fontsize=16)
+        plt.xlabel("p")#x轴p上的名字
+        plt.ylabel("D(p)")#y轴上的名字
+        plt.legend(loc = 'upper right')
+        plt.show()
+        
     def save(self,G,Epoch):
         #Save Graph
         result_dir = './result/'
-        info = "{}_{}_{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,self.intensity_selection,self.mutate_rate,Epoch)
+        info = "{}_{}_{}_{}".format(self.network_type,self.player_type,self.update_rule,Epoch)
         Epoch_dir = os.path.join(result_dir,self.dir_str,info)
         if not os.path.exists(Epoch_dir):
             os.mkdir(Epoch_dir)
@@ -355,10 +198,6 @@ class UG_Complex_Network():
         pq_path = os.path.join(Epoch_dir,info+"_strategy.csv")
         pq = pd.DataFrame(data = pq_array)
         pq.to_csv(pq_path)
-        #Save average offer/respond
-        avg_pq_path = os.path.join(Epoch_dir,info+"_average_strategy.csv")
-        avg_pq = pd.DataFrame(data = self.avg_pq_list)
-        avg_pq.to_csv(avg_pq_path)
 
 
     def retrain(self,filepath):
@@ -376,13 +215,8 @@ class UG_Complex_Network():
         self.network_type = parse_str[0]
         self.player_type = parse_str[1]
         self.update_rule = parse_str[2]
-        self.intensity_selection =  float(parse_str[3])
-        self.mutate_rate = float(parse_str[4])
-        Epoch = int(parse_str[5])
+        Epoch = int(parse_str[3])
         graph_path = os.path.join(result_dir,result_list[0])
-        avg_pq_path = os.path.join(result_dir,result_list[1])
-        avg_pq = pd.read_csv(avg_pq_path)
-        self.avg_strategy = avg_pq.values[-1][1:]
         G = nx.read_yaml(graph_path)
         return G,Epoch+1
         
@@ -421,38 +255,30 @@ class UG_Complex_Network():
         
 if __name__ == '__main__':
 
-    node_num = 100
-    network_type = "RG" # [SF, ER, RG]
-    update_rule ='PC'   # [NS, SP, DB, BD, PC, IU]
-    player_type = "C" # [A=(p=q,q), B=(p,1-p), C=(p,q)]
+    node_num = 10000
+    network_type = "ER" #"SF or ER"
+    update_rule ='SP'   #"NS or SP"
+    player_type = "B"
     avg_degree = 4
-    intensity_selection = 0.01
-    mutate_rate = 0.001
-    
-    avg_strategy_list = []
-    Epochs = pow(10,7)
+    Epochs = 21000
     check_point = None
-    # check_point = '2020-03-08-11-52-42'
+    # check_point = '2020-03-01-19-59-07'
     if check_point != None:
-        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,intensity_selection,mutate_rate,check_point)
+        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,check_point)
         G,Start  = UG.retrain(check_point)
     else:
         Start = 1
-        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree,intensity_selection)
+        UG = UG_Complex_Network(node_num,network_type,update_rule,player_type,avg_degree)
         #bulids network structure
         G = UG.build_network()
         #initialize the strategy of player in network
         UG.initialize_strategy(G)
     #play game
     for Epoch in range(Start,Epochs+1):
-        UG.initialize_payoff(G)
         UG.synchronous_play(G)
         UG.update(G)
-        UG.avg_strategy = UG.avg_strategy_calculate(G,Epoch)
-        if Epoch % 10000 == 0:
+        if Epoch % 100 == 0:
             print("Epoch[{}]".format(Epoch))
-            print("Average strategy: (p ,q)={}\n".format(UG.avg_strategy))
-            UG.avg_pq_list.append(UG.avg_strategy)
             UG.save(G,Epoch)
             # UG.viz(G)
             
